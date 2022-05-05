@@ -1,0 +1,94 @@
+.bg {
+	background-color: #F8F8FF;
+}
+
+.full-width {
+	width: 100vw;
+}
+
+.full-height {
+	height: 100vh;
+}
+
+.flex {
+	display: flex;
+}
+
+.justify-content-center {
+	justify-content: center;
+}
+
+.align-items-center {
+	align-items: center;
+}
+
+.justify-content-space-between {
+	justify-content: space-between;
+}
+
+.flex--fd-column {
+	flex-direction: column;
+}
+
+.crimson-text {
+	font-family: 'Crimson Text';
+}
+
+.title {
+	color: black;
+	font-style: italic;
+	font-size: 2rem;
+}
+
+.board {
+	width: 600px;
+	height: 600px;
+	background-color: tomato;
+}
+
+.square {
+	width: calc(600px/8);
+	height: calc(600px/8);
+	border: none;
+	box-sizing: border-box;
+}
+
+.square--light {
+	background-color: #EFD9B5;
+}
+
+.square--dark {
+	background-color: #B58863;
+}
+
+.square[highlighted=true] {
+	box-sizing: border-box;
+	border: 5px solid crimson;
+}
+
+.piece {
+	font-size: calc(600px/8 - 20px);
+	pointer-events: none
+}
+
+.piece--black {
+	color: black;
+}
+
+.piece--white {
+	color: whitesmoke;
+}
+
+[active-player="true"] {
+	text-decoration: underline;
+	animation-delay: 1s;
+}
+
+.text-decoration-line-trough {
+	text-decoration: line-through;
+}
+
+.clickable {
+	cursor: pointer;
+	font-size: 20px;
+}
