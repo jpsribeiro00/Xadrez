@@ -48,6 +48,11 @@ const addEventListenerOnSquares = () => {
     squares.forEach(square => square.addEventListener('mouseup', event => handleMouseUpOnSquare(event)));
 };
 
+const removeEventListenerOnSquares = () => {
+    const squares = Array.from(document.getElementsByClassName('square'));
+    squares.forEach(square => square.replaceWith(square.cloneNode(true)));
+}
+
 const handleMouseUpOnSquare = event => {
 
     const selectedPiece = document.querySelector('[selected=true]');
@@ -60,6 +65,7 @@ const handleMouseUpOnSquare = event => {
         event.target.appendChild(clonePiece);
         removeSelectedPiece();
     }
+    cleanHighlightedSquares();
 };
 
 const highlightSquare = (coordinates, specialMove) => {
@@ -170,10 +176,30 @@ const getPieceObjFromCoordinates = (coordinates) => {
     return childElement;
 }
 
+const getPlayerFromCoordinates = coordinates => {
+    const domElement = document.getElementById(coordinates);
+    if (domElement === null) {
+        return null;
+    }
+    const childElement = domElement.firstChild;
+    const player = childElement && childElement.attributes.player.value;
+    return player;
+}
+
+const cleanHighlightedSquares = () => {
+    document
+        .querySelectorAll('[highlighted]')
+        .forEach(el => el.removeAttribute('highlighted'));
+};
+
 const handleMouseDownOnSquare = event => {
     event.preventDefault() // Impede que tabuleiro seja arrastado junto
     const coordinates = event.target.id;
     const piece = getPieceFromCoordinates(coordinates);
+    if (!piece) {
+        console.log(`Peça na coordenada ${coordinates.toUpperCase()}: vazio`);
+        return;
+    }
 
     if(event.target.firstChild !== null){
         event.target.firstChild.setAttribute('selected', true);
