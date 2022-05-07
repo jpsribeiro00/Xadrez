@@ -62,6 +62,64 @@ const handleMouseUpOnSquare = event => {
     }
 };
 
+const highlightSquare = (coordinates, specialMove) => {
+    const element = document.getElementById(coordinates);
+    if (element === null) {
+        return;
+    }
+    element.setAttribute('highlighted', true);
+    if (specialMove) {
+        element.setAttribute('specialMove', specialMove);
+    }
+};
+
+const highlightPawnAvailableMoves = (player, coordinates, alreadyMoved) => {
+    const [startFile, startRank] = coordinates.split('');
+    let availableMovementMoves = [getMoveRankCoordinates(startRank, 1, player)];
+    availableMovementMoves = availableMovementMoves
+        .map(rank => `${startFile}${rank}`)
+        .filter(coordinates => getPieceFromCoordinates(coordinates) === null);
+    if (!alreadyMoved && availableMovementMoves.length > 0) {
+        const extraMove = getMoveRankCoordinates(startRank, 2, player);
+        const extraMoveCoordinates = `${startFile}${extraMove}`;
+        if (getPieceFromCoordinates(extraMoveCoordinates) === null) {
+            availableMovementMoves.push(extraMoveCoordinates);
+        }
+    }
+    const availableAttackMoves = [
+            getMoveFileCoordinates(startFile, 1, player),
+            getMoveFileCoordinates(startFile, -1, player)
+        ]
+        .map(file => `${file}${getMoveRankCoordinates(startRank, 1, player)}`)
+        .filter(coordinates => getPieceFromCoordinates(coordinates) !== null)
+        .filter(coordinates => getPlayerFromCoordinates(coordinates) !== player);
+
+    const enPassantMoves = [
+            getMoveFileCoordinates(startFile, 1, player),
+            getMoveFileCoordinates(startFile, -1, player),
+        ]
+        .map(file => `${file}${startRank}`)
+        .filter(square => {
+            const piece = getPieceObjFromCoordinates(square);
+            return piece &&
+                piece.attributes.canExecuteEnPassant &&
+                piece.attributes.canExecuteEnPassant.value === 'true';
+        })
+        .map(square => `${square.split('')[0]}${Number.parseInt(square.split('')[1])+1}`);
+
+    availableMovementMoves.forEach(square => highlightSquare(square));
+    availableAttackMoves.forEach(square => highlightSquare(square));
+    enPassantMoves.forEach(square => highlightSquare(square, 'enPassant'));
+};
+
+const getHighlightAvailableMovesFnBySelectedPiece = (piece) => {
+    const MapPiescesToAvailableMovesFn = {
+        pawn: highlightPawnAvailableMoves
+    };
+    return MapPiescesToAvailableMovesFn[piece] ||
+        (() => console.log('A peça selecionada não possui uma função de movimento implementada'));
+};
+
 const removeSelectedPiece = () => {
     const selectedPiece = document.querySelector('[selected=true]');
     if (selectedPiece) {
@@ -69,10 +127,61 @@ const removeSelectedPiece = () => {
     }
 };
 
+const getPieceFromCoordinates = (coordinates, player) => {
+    const domElement = document.getElementById(coordinates);
+    if (domElement === null) {
+        return null;
+    }
+    const childElement = domElement.firstChild;
+    if (!childElement) {
+        return null;
+    }
+    const piece = player === undefined ?
+        childElement && childElement.attributes.piece.value :
+        childElement && childElement.attributes.piece.value && childElement.attributes.player.value === value;
+    return piece;
+}
+
+const getMoveRankCoordinates = (startRank, numberOfSquares, player) => {
+    const playerVariant = player === 'white' ? 1 : -1;
+    const startRankNumber = typeof startRank === 'string' ?
+        Number.parseInt(startRank) :
+        startRank;
+    return startRankNumber + numberOfSquares * playerVariant;
+}
+
+const getMoveFileCoordinates = (startFile, numberOfSquares, player) => {
+    const playerVariant = player === 'white' ? 1 : -1;
+    const startFileIndex = FILES.indexOf(startFile);
+    const finalFileIndex = startFileIndex + numberOfSquares * playerVariant;
+    return FILES[finalFileIndex];
+}
+
+const getPieceObjFromCoordinates = (coordinates) => {
+    const domElement = document.getElementById(coordinates);
+    if (domElement === null) {
+        return null;
+    }
+    const childElement = domElement.firstChild;
+    if (!childElement) {
+        return null;
+    }
+
+    return childElement;
+}
+
 const handleMouseDownOnSquare = event => {
     event.preventDefault() // Impede que tabuleiro seja arrastado junto
+    const coordinates = event.target.id;
+    const piece = getPieceFromCoordinates(coordinates);
 
     if(event.target.firstChild !== null){
         event.target.firstChild.setAttribute('selected', true);
     }
+    const pieceColor = event.target.firstChild.attributes.player.value;
+
+    const hightlightAvailableMovesFn = getHighlightAvailableMovesFnBySelectedPiece(piece);
+    const alreadyMoved = event.target.firstChild.attributes.alreadyMoved &&
+        event.target.firstChild.attributes.alreadyMoved.value;
+    hightlightAvailableMovesFn(pieceColor, coordinates, alreadyMoved);
 };
