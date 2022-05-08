@@ -54,17 +54,21 @@ const removeEventListenerOnSquares = () => {
 }
 
 const handleMouseUpOnSquare = event => {
+    const isSquareAvailableMove = event.target.attributes.highlighted &&
+        !!event.target.attributes.highlighted.value;
+    
+    if (isSquareAvailableMove) {
+        const selectedPiece = document.querySelector('[selected=true]');
 
-    const selectedPiece = document.querySelector('[selected=true]');
+        if(selectedPiece !== null){
+            let clonePiece = selectedPiece.cloneNode(true);
+            clonePiece.setAttribute('alreadyMoved', true);
+            selectedPiece.parentNode.removeChild(selectedPiece);
 
-    if(selectedPiece !== null){
-        let clonePiece = selectedPiece.cloneNode(true);
-        clonePiece.setAttribute('alreadyMoved', true);
-        selectedPiece.parentNode.removeChild(selectedPiece);
-
-        event.target.appendChild(clonePiece);
-        removeSelectedPiece();
+            event.target.appendChild(clonePiece);
+        }
     }
+    removeSelectedPiece();
     cleanHighlightedSquares();
 };
 
@@ -200,11 +204,9 @@ const handleMouseDownOnSquare = event => {
         console.log(`Peça na coordenada ${coordinates.toUpperCase()}: vazio`);
         return;
     }
-
-    if(event.target.firstChild !== null){
-        event.target.firstChild.setAttribute('selected', true);
-    }
+    event.target.firstChild.setAttribute('selected', true);
     const pieceColor = event.target.firstChild.attributes.player.value;
+    console.log(`Peça na coordenada ${coordinates.toUpperCase()}: ${piece} ${pieceColor}`);
 
     const hightlightAvailableMovesFn = getHighlightAvailableMovesFnBySelectedPiece(piece);
     const alreadyMoved = event.target.firstChild.attributes.alreadyMoved &&
