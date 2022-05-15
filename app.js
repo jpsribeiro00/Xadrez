@@ -127,7 +127,9 @@ const getHighlightAvailableMovesFnBySelectedPiece = (piece) => {
         pawn: highlightPawnAvailableMoves,
         knight: highlightKnightAvailableMoves,
         bishop: highlightBishopAvailableMoves,
-		rook: highlightRookAvailableMoves
+		rook: highlightRookAvailableMoves,
+        queen: highlightQueenAvailableMoves
+
     };
     return MapPiecesToAvailableMovesFn[piece] ||
         (() => console.log('A peça selecionada não possui uma função de movimento implementada'));
@@ -323,6 +325,11 @@ const highlightRookAvailableMoves = (player, coordinates, alreadyMoved) => {
     }
 
     squares.forEach(square => highlightSquare(square));
+};
+
+const highlightQueenAvailableMoves = (player, coordinates) => {
+    highlightRookAvailableMoves(player, coordinates);
+    highlightBishopAvailableMoves(player, coordinates);
 };
 
 const handleMouseDownOnSquare = event => {
