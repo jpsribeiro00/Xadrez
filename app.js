@@ -123,12 +123,13 @@ const highlightPawnAvailableMoves = (player, coordinates, alreadyMoved) => {
 };
 
 const getHighlightAvailableMovesFnBySelectedPiece = (piece) => {
-    const MapPiescesToAvailableMovesFn = {
+    const MapPiecesToAvailableMovesFn = {
         pawn: highlightPawnAvailableMoves,
         knight: highlightKnightAvailableMoves,
-        bishop: highlightBishopAvailableMoves
+        bishop: highlightBishopAvailableMoves,
+		rook: highlightRookAvailableMoves
     };
-    return MapPiescesToAvailableMovesFn[piece] ||
+    return MapPiecesToAvailableMovesFn[piece] ||
         (() => console.log('A peça selecionada não possui uma função de movimento implementada'));
 };
 
@@ -247,6 +248,81 @@ const highlightKnightAvailableMoves = (player, coordinates) => {
     availableMovementMoves
         .filter(coordinates => getPlayerFromCoordinates(coordinates) !== player)
         .forEach(coordinates => highlightSquare(coordinates));
+};
+
+const highlightRookAvailableMoves = (player, coordinates, alreadyMoved) => {
+    const getSquaresToHighlight = (ranksOrFiles, operator) => {
+        const [startFile, startRank] = coordinates.split('');
+        const comparator = ranksOrFiles === 'ranks' ? startRank : startFile;
+        const filterFn = operator === 'greaterThan' ?
+            square => comparator > square :
+            square => comparator < square;
+        const mapFn = ranksOrFiles === 'ranks' ?
+            rank => `${startFile}${rank}` :
+            file => `${file}${startRank}`;
+        const arr = ranksOrFiles === 'ranks' ? RANKS : FILES;
+        const squares = arr.filter(filterFn).map(mapFn);
+        let indexFoundPiece = squares
+            .findIndex(square => getPieceFromCoordinates(square) !== null);
+        if (indexFoundPiece === -1) {
+            return squares;
+        }
+        foundPiece = squares[indexFoundPiece];
+        if (operator === 'greaterThan') {
+            const squaresThatHasPieces = squares
+                .filter(coordinates => getPlayerFromCoordinates(coordinates) !== null);
+            foundPiece = squaresThatHasPieces[squaresThatHasPieces.length - 1];
+            indexFoundPiece = squares.indexOf(foundPiece);
+        }
+        const greaterThanFilterIndexFn = operator === 'greaterThan' ?
+            (_, index) => index > indexFoundPiece :
+            (_, index) => index < indexFoundPiece;
+        const greaterThanEqualFilterIndexFn = operator === 'greaterThan' ?
+            (_, index) => index >= indexFoundPiece :
+            (_, index) => index <= indexFoundPiece;
+        const foundPiecePlayer = getPlayerFromCoordinates(foundPiece);
+        const squaresToHighlight = foundPiecePlayer === player ?
+            squares.filter(greaterThanFilterIndexFn) :
+            squares.filter(greaterThanEqualFilterIndexFn);
+
+        return squaresToHighlight;
+
+    }
+    const squaresDown = getSquaresToHighlight('ranks', 'greaterThan');
+    const squaresUp = getSquaresToHighlight('ranks', 'lessThan');
+    const squaresLeft = getSquaresToHighlight('files', 'greaterThan');
+    const squaresRight = getSquaresToHighlight('files', 'lessThan');
+    const squares = [...squaresDown, ...squaresUp, ...squaresLeft, ...squaresRight];
+    
+    const currentPiece = getPieceFromCoordinates(coordinates);
+
+    // castling
+    if (!alreadyMoved && player === 'white' && currentPiece === 'rook') {
+        const piece = getPieceObjFromCoordinates('e1');
+        if (piece !== null
+            && !piece.attributes.alreadyMoved
+            && piece.attributes.piece.value === 'king'
+        ) {
+            const piecesOnTheWay = [];
+            const currentFile = coordinates.split('')[0];
+            if (currentFile === 'a') {
+                for (let i = 1; i < FILES.indexOf('e'); i++) {
+                    const rank = getMoveFileCoordinates('a', i, 'white');
+                    piecesOnTheWay.push(`${rank}1`);
+                }
+            } else {
+                for (let i = 7; i > FILES.indexOf('e')+1; i--) {
+                    const rank = getMoveFileCoordinates('h', (8 - i) * -1, 'white');
+                    piecesOnTheWay.push(`${rank}1`);
+                }
+            }
+            if (piecesOnTheWay.every(coordinates => getPieceFromCoordinates(coordinates) === null)) {
+                squares.push('e1')
+            }
+        }
+    }
+
+    squares.forEach(square => highlightSquare(square));
 };
 
 const handleMouseDownOnSquare = event => {
