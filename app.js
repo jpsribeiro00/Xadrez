@@ -124,7 +124,9 @@ const highlightPawnAvailableMoves = (player, coordinates, alreadyMoved) => {
 
 const getHighlightAvailableMovesFnBySelectedPiece = (piece) => {
     const MapPiescesToAvailableMovesFn = {
-        pawn: highlightPawnAvailableMoves
+        pawn: highlightPawnAvailableMoves,
+        knight: highlightKnightAvailableMoves,
+        bishop: highlightBishopAvailableMoves
     };
     return MapPiescesToAvailableMovesFn[piece] ||
         (() => console.log('A peça selecionada não possui uma função de movimento implementada'));
@@ -194,6 +196,57 @@ const cleanHighlightedSquares = () => {
     document
         .querySelectorAll('[highlighted]')
         .forEach(el => el.removeAttribute('highlighted'));
+};
+
+const highlightBishopAvailableMoves = (player, coordinates) => {
+    const [startFile, startRank] = coordinates.split('');
+    const moves = [];
+    const edgeCoordinates = [
+        [1, 1],
+        [1, -1],
+        [-1, 1],
+        [-1, -1]
+    ];
+
+    edgeCoordinates.forEach(coordinates => {
+        let multiplier = 1;
+        let moveFile = getMoveFileCoordinates(startFile, coordinates[0] * multiplier, player);
+        let moveRank = getMoveRankCoordinates(startRank, coordinates[1] * multiplier, player);
+        while (moveFile && moveRank) {
+            const coordenadas = `${moveFile}${moveRank}`;
+            if (getPieceFromCoordinates(coordenadas)) {
+                if (getPlayerFromCoordinates(coordenadas) === player) {
+                    return;
+                }
+                moves.push(coordenadas);
+                return;
+            }
+            moves.push(coordenadas);
+            multiplier += 1;
+            moveFile = getMoveFileCoordinates(startFile, coordinates[0] * multiplier, player);
+            moveRank = getMoveRankCoordinates(startRank, coordinates[1] * multiplier, player);
+        }
+    });
+
+    moves
+        .filter(coordinates => getPlayerFromCoordinates(coordinates) !== player)
+        .forEach(coordinates => highlightSquare(coordinates));
+};
+
+const highlightKnightAvailableMoves = (player, coordinates) => {
+    const [startFile, startRank] = coordinates.split('');
+        const directions = [-1, 1, 2, -2];
+        const directionsCombination = directions
+            .flatMap(direction => directions.map(value => [direction, value]))
+            .filter(combination => !combination.every((value, i, arr) => Math.abs(value) === Math.abs(arr[0])));
+    const availableMovementMoves = directionsCombination
+        .map(combination => {
+            return getMoveFileCoordinates(startFile, combination[0], player)
+            + getMoveRankCoordinates(startRank, combination[1], player)
+        });
+    availableMovementMoves
+        .filter(coordinates => getPlayerFromCoordinates(coordinates) !== player)
+        .forEach(coordinates => highlightSquare(coordinates));
 };
 
 const handleMouseDownOnSquare = event => {
