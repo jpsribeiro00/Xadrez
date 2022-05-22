@@ -56,17 +56,46 @@ const removeEventListenerOnSquares = () => {
 const handleMouseUpOnSquare = event => {
     const isSquareAvailableMove = event.target.attributes.highlighted &&
         !!event.target.attributes.highlighted.value;
-    
+
     if (isSquareAvailableMove) {
         const selectedPiece = document.querySelector('[selected=true]');
+        let clonePiece = selectedPiece.cloneNode(true);
+        clonePiece.setAttribute('alreadyMoved', true);
+        const initialCoordinates = selectedPiece.parentNode.id;
+        clonePiece = setupEnPassant(clonePiece, clonePiece.attributes.player.value, event.target.id);
+        selectedPiece.parentNode.removeChild(selectedPiece);
+        const elementToRemove = event.target.firstChild;
 
-        if(selectedPiece !== null){
-            let clonePiece = selectedPiece.cloneNode(true);
-            clonePiece.setAttribute('alreadyMoved', true);
-            selectedPiece.parentNode.removeChild(selectedPiece);
-
-            event.target.appendChild(clonePiece);
+        if (event.target.attributes.specialMove
+            && event.target.attributes.specialMove.value
+            && event.target.attributes.specialMove.value === 'enPassant'
+        ) {
+            enPassant(event.target.id, 'white');
         }
+
+        if (elementToRemove) {
+            const mapPiecesToScore = { pawn: 1, knight: 3, bishop: 3, rook: 5, queen: 9, king: 0 };
+            const elementToRemoveClone = elementToRemove.cloneNode(true);
+            const removedPiece = elementToRemove.attributes.piece.value;
+            const score = mapPiecesToScore[removedPiece];
+            increaseActivePlayerScore(score);
+            elementToRemove.parentNode.removeChild(elementToRemove);
+            if (removedPiece === 'king') {
+                if (isPieceFromActivePlayer(elementToRemoveClone.attributes.player.value)) {
+                    castling(clonePiece, initialCoordinates, clonePiece.attributes.player.value);
+                    cleanHighlightedSquares();
+                } else {
+                    event.target.appendChild(clonePiece);
+                    finishGame();
+                }
+                return;
+            }
+        }
+
+        const newPiece = setUpSpecialMoves(clonePiece, event.target.id, clonePiece.attributes.player.value);
+
+        event.target.appendChild(newPiece);
+        changeActivePlayer();
     }
     removeSelectedPiece();
     cleanHighlightedSquares();
@@ -82,6 +111,64 @@ const highlightSquare = (coordinates, specialMove) => {
         element.setAttribute('specialMove', specialMove);
     }
 };
+
+const increaseActivePlayerScore = score => {
+    const players = Array.from(document.getElementsByClassName('js-player'))
+        .filter(player => player.attributes['active-player'].value === 'true');
+    const activePlayer = players[0];;
+    const oldScore = Number.parseInt(activePlayer.textContent.split(' ')[2]);
+    const newScore = oldScore + score;
+    activePlayer.innerHTML = activePlayer.textContent
+        .split(' ')
+        .slice(0, 2)
+        .concat(newScore)
+        .join(' ');
+}
+
+const finishGame = () => {
+    const players = Array.from(document.getElementsByClassName('js-player'))
+        .sort((a, b) => a.attributes['active-player'].value === 'true' ? -1 : 1);
+    const lostPlayer = players[1];
+    const classes = lostPlayer.attributes.class.value;
+    const classesWithLineTrough = [...classes.split(' '), 'text-decoration-line-trough'].join(' ');
+    lostPlayer.setAttribute('class', classesWithLineTrough);
+    removeSelectedPiece();
+    cleanHighlightedSquares();
+    removeEventListenerOnSquares();
+    observer.disconnect();
+
+    console.log(`${players[0].innerHTML.split(':')[0]} ganhou o jogo!`);
+}
+
+const setUpSpecialMoves = (piece, coordinates, player) => {
+    const newPiece = piece.cloneNode(true);
+
+    if (newPiece.attributes.piece.value === 'pawn') {
+        const rank = coordinates[1];
+        if ((player === 'white' && rank === '8') || (player === 'black' && rank === '1')) {
+            newPiece.setAttribute('piece', 'rook');
+            newPiece.classList.remove('fa-chess-pawn');
+            newPiece.classList.add('fa-chess-rook');
+        }
+    }
+    return newPiece;
+}
+
+const changeActivePlayer = () => {
+    const players = Array.from(document.getElementsByClassName('js-player'))
+        .sort((a, b) => a.attributes['active-player'].value === 'true' ? -1 : 1);
+    players[0].setAttribute('active-player', false);
+    players[1].setAttribute('active-player', true);
+    removeEnPassant(players[1].textContent.substr(0, 8).split(' ').join('-').toLowerCase());
+}
+
+const isPieceFromActivePlayer = pieceColor => {
+    const players = Array.from(document.getElementsByClassName('js-player'))
+        .filter(player => player.attributes['active-player'].value === 'true');
+    const activePlayer = players[0].innerHTML.split(' ')[1].charAt(0);
+    return (activePlayer === '1' && pieceColor === 'white') ||
+        (activePlayer === '2' && pieceColor === 'black');
+}
 
 const highlightPawnAvailableMoves = (player, coordinates, alreadyMoved) => {
     const [startFile, startRank] = coordinates.split('');
@@ -344,6 +431,65 @@ const highlightKingAvailableMoves = (player, coordinates) => {
     moves.forEach(move => highlightSquare(move));
 }
 
+const castling = (piece, initialCoordinates, player) => {
+    const newPiece = piece.cloneNode(true);
+    if (newPiece.attributes.piece.value == 'rook' && player === 'white') {
+        newPiece.setAttribute('castling', true);
+        const king = buildPiece('king', 'white')
+
+        if (initialCoordinates === 'a1') {
+            document.getElementById('d1').appendChild(newPiece);
+            document.getElementById('c1').appendChild(king);
+        } else {
+            document.getElementById('f1').appendChild(newPiece);
+            document.getElementById('g1').appendChild(king);
+        }
+
+    }
+}
+
+const enPassant = (coordinates, player) => {
+    const file = coordinates.split('')[1];
+    const pieceFile = getMoveRankCoordinates(file, -1, player);
+    const pieceCoordinate = `${coordinates.split('')[0]}${pieceFile}`;
+
+    const square = document.getElementById(pieceCoordinate);
+    const cloneSquare = square.cloneNode(false);
+    square.parentNode.replaceChild(cloneSquare, square);
+}
+
+const setupEnPassant = (piece, player, coordinates) => {
+    const file = coordinates.split('')[1];
+    const newPiece = piece.cloneNode(true);
+    const canExecuteEnPassant = !(piece.attributes.canExecuteEnPassant);
+    if (
+        newPiece.attributes.piece.value == 'pawn' &&
+        player === 'black' &&
+        newPiece.attributes.alreadyMoved &&
+        newPiece.attributes.alreadyMoved.value === 'true' &&
+        file === '5'
+    ) {
+
+        newPiece.setAttribute('canExecuteEnPassant', canExecuteEnPassant);
+    }
+    return newPiece;
+}
+
+const removeEnPassant = (player) => {
+    if (player === 'player-1') {
+        return;
+    }
+    const piecesToRemoveEnPassant = document.querySelectorAll(`[canExecuteEnPassant='true']`);
+    const piecesToRemoveEnPassantArr = piecesToRemoveEnPassant ? Array.from(piecesToRemoveEnPassant) : [];
+    piecesToRemoveEnPassantArr.forEach(piece => {
+        const newPiece = piece.cloneNode(true);
+        newPiece.setAttribute('canExecuteEnPassant', 'false');
+        const parent = piece.parentNode;
+        parent.removeChild(piece);
+        parent.appendChild(newPiece);
+    });
+}
+
 const handleMouseDownOnSquare = event => {
     event.preventDefault() // Impede que tabuleiro seja arrastado junto
     const coordinates = event.target.id;
@@ -355,7 +501,9 @@ const handleMouseDownOnSquare = event => {
     event.target.firstChild.setAttribute('selected', true);
     const pieceColor = event.target.firstChild.attributes.player.value;
     console.log(`Peça na coordenada ${coordinates.toUpperCase()}: ${piece} ${pieceColor}`);
-
+    if (!isPieceFromActivePlayer(pieceColor)) {
+        return;
+    }
     const hightlightAvailableMovesFn = getHighlightAvailableMovesFnBySelectedPiece(piece);
     const alreadyMoved = event.target.firstChild.attributes.alreadyMoved &&
         event.target.firstChild.attributes.alreadyMoved.value;
