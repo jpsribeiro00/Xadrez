@@ -423,8 +423,7 @@ const highlightKingAvailableMoves = (player, coordinates) => {
     const [startFile, startRank] = coordinates.split('');
     const directions = [-1, 0, 1];
     const directionsCombination = directions
-        .flatMap(direction => directions.map(value => [direction, value]))
-        .filter(combination => combination.every(value => value === 0));
+        .flatMap(direction => directions.map(value => [direction, value]));
     const moves = directionsCombination
         .map(direction => `${getMoveFileCoordinates(startFile, direction[0], player)}${getMoveRankCoordinates(startRank, direction[1], player)}`)
         .filter(coordinates => getPlayerFromCoordinates(coordinates) !== player);
