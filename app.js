@@ -6,12 +6,32 @@ let observer = new MutationObserver(() => {});
 window.onload = () => {
     setupInitialPiecesPositions();
     addEventListenerOnSquares();
+    document.getElementById('start-ia-vs-ia').addEventListener('click', () => {
+        executeAITurn('white');
+        startAIvsAI();
+    });
     const player2 = document.getElementById('player-2')
+
+    // https://stackoverflow.com/a/41425087
+    observer = new MutationObserver(mutations => {
+        mutations.forEach(mutation => {
+            if (mutation.type == "attributes" && player2.attributes['active-player'].value === 'true') {
+                setTimeout(() => executeAITurn('black'), 300);
+            } else if (isAIvsAIEnabled()) {
+                setTimeout(() => executeAITurn('white'), 300);
+            }
+        });
+    });
 
     observer.observe(player2, {
         attributes: true
     });
 };
+
+const isAIvsAIEnabled = () => {
+    return document.getElementById('start-ia-vs-ia').attributes.class 
+    && document.getElementById('start-ia-vs-ia').attributes.class.value.split(' ').includes('text-decoration-line-trough');
+}
 
 const setupInitialPiecesPositions = () => {
     const pawns = new Array(8)
@@ -54,6 +74,7 @@ const removeEventListenerOnSquares = () => {
 }
 
 const handleMouseUpOnSquare = event => {
+    // https://www.samanthaming.com/tidbits/19-2-ways-to-convert-to-boolean/
     const isSquareAvailableMove = event.target.attributes.highlighted &&
         !!event.target.attributes.highlighted.value;
 
@@ -81,7 +102,7 @@ const handleMouseUpOnSquare = event => {
             increaseActivePlayerScore(score);
             elementToRemove.parentNode.removeChild(elementToRemove);
             if (removedPiece === 'king') {
-                if (isPieceFromActivePlayer(elementToRemoveClone.attributes.player.value)) {
+                if (isPieceFromActivePlayer(elementToRemoveClone.attributes.player.value) && !isAIvsAIEnabled()) {
                     castling(clonePiece, initialCoordinates, clonePiece.attributes.player.value);
                     cleanHighlightedSquares();
                 } else {
@@ -101,18 +122,8 @@ const handleMouseUpOnSquare = event => {
     cleanHighlightedSquares();
 };
 
-const highlightSquare = (coordinates, specialMove) => {
-    const element = document.getElementById(coordinates);
-    if (element === null) {
-        return;
-    }
-    element.setAttribute('highlighted', true);
-    if (specialMove) {
-        element.setAttribute('specialMove', specialMove);
-    }
-};
-
 const increaseActivePlayerScore = score => {
+    // https://github.com/airbnb/css#javascript-hooks
     const players = Array.from(document.getElementsByClassName('js-player'))
         .filter(player => player.attributes['active-player'].value === 'true');
     const activePlayer = players[0];;
@@ -140,26 +151,73 @@ const finishGame = () => {
     console.log(`${players[0].innerHTML.split(':')[0]} ganhou o jogo!`);
 }
 
-const setUpSpecialMoves = (piece, coordinates, player) => {
-    const newPiece = piece.cloneNode(true);
-
-    if (newPiece.attributes.piece.value === 'pawn') {
-        const rank = coordinates[1];
-        if ((player === 'white' && rank === '8') || (player === 'black' && rank === '1')) {
-            newPiece.setAttribute('piece', 'rook');
-            newPiece.classList.remove('fa-chess-pawn');
-            newPiece.classList.add('fa-chess-rook');
-        }
-    }
-    return newPiece;
-}
-
 const changeActivePlayer = () => {
     const players = Array.from(document.getElementsByClassName('js-player'))
         .sort((a, b) => a.attributes['active-player'].value === 'true' ? -1 : 1);
     players[0].setAttribute('active-player', false);
     players[1].setAttribute('active-player', true);
     removeEnPassant(players[1].textContent.substr(0, 8).split(' ').join('-').toLowerCase());
+}
+
+const removeSelectedPiece = () => {
+    const selectedPiece = document.querySelector('[selected=true]');
+    if (selectedPiece) {
+        selectedPiece.setAttribute('selected', false);
+    }
+};
+
+const cleanHighlightedSquares = () => {
+    document
+        .querySelectorAll('[highlighted]')
+        .forEach(el => el.removeAttribute('highlighted'));
+};
+
+const handleMouseDownOnSquare = event => {
+    event.preventDefault() // Impede que tabuleiro seja arrastado junto
+    const coordinates = event.target.id;
+    const piece = getPieceFromCoordinates(coordinates);
+    if (!piece) {
+        console.log(`Peça na coordenada ${coordinates.toUpperCase()}: vazio`);
+        return;
+    }
+    event.target.firstChild.setAttribute('selected', true);
+    const pieceColor = event.target.firstChild.attributes.player.value;
+    console.log(`Peça na coordenada ${coordinates.toUpperCase()}: ${piece} ${pieceColor}`);
+    if (!isPieceFromActivePlayer(pieceColor)) {
+        return;
+    }
+    const hightlightAvailableMovesFn = getHighlightAvailableMovesFnBySelectedPiece(piece);
+    const alreadyMoved = event.target.firstChild.attributes.alreadyMoved &&
+        event.target.firstChild.attributes.alreadyMoved.value;
+    hightlightAvailableMovesFn(pieceColor, coordinates, alreadyMoved);
+};
+
+const getPieceFromCoordinates = (coordinates, player) => {
+    const domElement = document.getElementById(coordinates);
+    if (domElement === null) {
+        return null;
+    }
+    const childElement = domElement.firstChild;
+    if (!childElement) {
+        return null;
+    }
+    const piece = player === undefined ?
+        childElement && childElement.attributes.piece.value :
+        childElement && childElement.attributes.piece.value && childElement.attributes.player.value === value;
+    return piece;
+}
+
+const getPieceObjFromCoordinates = (coordinates) => {
+    const domElement = document.getElementById(coordinates);
+    if (domElement === null) {
+        return null;
+    }
+    const childElement = domElement.firstChild;
+    if (!childElement) {
+        return null;
+    }
+
+    return childElement;
 }
 
 const isPieceFromActivePlayer = pieceColor => {
@@ -169,6 +227,19 @@ const isPieceFromActivePlayer = pieceColor => {
     return (activePlayer === '1' && pieceColor === 'white') ||
         (activePlayer === '2' && pieceColor === 'black');
 }
+
+const getHighlightAvailableMovesFnBySelectedPiece = (piece) => {
+    const MapPiescesToAvailableMovesFn = {
+        pawn: highlightPawnAvailableMoves,
+        knight: highlightKnightAvailableMoves,
+        bishop: highlightBishopAvailableMoves,
+        rook: highlightRookAvailableMoves,
+        queen: highlightQueenAvailableMoves,
+        king: highlightKingAvailableMoves,
+    };
+    return MapPiescesToAvailableMovesFn[piece] ||
+        (() => console.log('A peça selecionada não possui uma função de movimento implementada'));
+};
 
 const highlightPawnAvailableMoves = (player, coordinates, alreadyMoved) => {
     const [startFile, startRank] = coordinates.split('');
@@ -209,83 +280,20 @@ const highlightPawnAvailableMoves = (player, coordinates, alreadyMoved) => {
     enPassantMoves.forEach(square => highlightSquare(square, 'enPassant'));
 };
 
-const getHighlightAvailableMovesFnBySelectedPiece = (piece) => {
-    const MapPiecesToAvailableMovesFn = {
-        pawn: highlightPawnAvailableMoves,
-        knight: highlightKnightAvailableMoves,
-        bishop: highlightBishopAvailableMoves,
-		rook: highlightRookAvailableMoves,
-        queen: highlightQueenAvailableMoves,
-        king: highlightKingAvailableMoves,
-    };
-    return MapPiecesToAvailableMovesFn[piece] ||
-        (() => console.log('A peça selecionada não possui uma função de movimento implementada'));
-};
-
-const removeSelectedPiece = () => {
-    const selectedPiece = document.querySelector('[selected=true]');
-    if (selectedPiece) {
-        selectedPiece.setAttribute('selected', false);
-    }
-};
-
-const getPieceFromCoordinates = (coordinates, player) => {
-    const domElement = document.getElementById(coordinates);
-    if (domElement === null) {
-        return null;
-    }
-    const childElement = domElement.firstChild;
-    if (!childElement) {
-        return null;
-    }
-    const piece = player === undefined ?
-        childElement && childElement.attributes.piece.value :
-        childElement && childElement.attributes.piece.value && childElement.attributes.player.value === value;
-    return piece;
-}
-
-const getMoveRankCoordinates = (startRank, numberOfSquares, player) => {
-    const playerVariant = player === 'white' ? 1 : -1;
-    const startRankNumber = typeof startRank === 'string' ?
-        Number.parseInt(startRank) :
-        startRank;
-    return startRankNumber + numberOfSquares * playerVariant;
-}
-
-const getMoveFileCoordinates = (startFile, numberOfSquares, player) => {
-    const playerVariant = player === 'white' ? 1 : -1;
-    const startFileIndex = FILES.indexOf(startFile);
-    const finalFileIndex = startFileIndex + numberOfSquares * playerVariant;
-    return FILES[finalFileIndex];
-}
-
-const getPieceObjFromCoordinates = (coordinates) => {
-    const domElement = document.getElementById(coordinates);
-    if (domElement === null) {
-        return null;
-    }
-    const childElement = domElement.firstChild;
-    if (!childElement) {
-        return null;
-    }
-
-    return childElement;
-}
-
-const getPlayerFromCoordinates = coordinates => {
-    const domElement = document.getElementById(coordinates);
-    if (domElement === null) {
-        return null;
-    }
-    const childElement = domElement.firstChild;
-    const player = childElement && childElement.attributes.player.value;
-    return player;
-}
-
-const cleanHighlightedSquares = () => {
-    document
-        .querySelectorAll('[highlighted]')
-        .forEach(el => el.removeAttribute('highlighted'));
+const highlightKnightAvailableMoves = (player, coordinates) => {
+    const [startFile, startRank] = coordinates.split('');
+        const directions = [-1, 1, 2, -2];
+        const directionsCombination = directions
+            .flatMap(direction => directions.map(value => [direction, value]))
+            .filter(combination => !combination.every((value, i, arr) => Math.abs(value) === Math.abs(arr[0])));
+    const availableMovementMoves = directionsCombination
+        .map(combination => {
+            return getMoveFileCoordinates(startFile, combination[0], player)
+            + getMoveRankCoordinates(startRank, combination[1], player)
+        });
+    availableMovementMoves
+        .filter(coordinates => getPlayerFromCoordinates(coordinates) !== player)
+        .forEach(coordinates => highlightSquare(coordinates));
 };
 
 const highlightBishopAvailableMoves = (player, coordinates) => {
@@ -319,22 +327,6 @@ const highlightBishopAvailableMoves = (player, coordinates) => {
     });
 
     moves
-        .filter(coordinates => getPlayerFromCoordinates(coordinates) !== player)
-        .forEach(coordinates => highlightSquare(coordinates));
-};
-
-const highlightKnightAvailableMoves = (player, coordinates) => {
-    const [startFile, startRank] = coordinates.split('');
-        const directions = [-1, 1, 2, -2];
-        const directionsCombination = directions
-            .flatMap(direction => directions.map(value => [direction, value]))
-            .filter(combination => !combination.every((value, i, arr) => Math.abs(value) === Math.abs(arr[0])));
-    const availableMovementMoves = directionsCombination
-        .map(combination => {
-            return getMoveFileCoordinates(startFile, combination[0], player)
-            + getMoveRankCoordinates(startRank, combination[1], player)
-        });
-    availableMovementMoves
         .filter(coordinates => getPlayerFromCoordinates(coordinates) !== player)
         .forEach(coordinates => highlightSquare(coordinates));
 };
@@ -414,20 +406,70 @@ const highlightRookAvailableMoves = (player, coordinates, alreadyMoved) => {
     squares.forEach(square => highlightSquare(square));
 };
 
+
 const highlightQueenAvailableMoves = (player, coordinates) => {
     highlightRookAvailableMoves(player, coordinates);
     highlightBishopAvailableMoves(player, coordinates);
 };
 
 const highlightKingAvailableMoves = (player, coordinates) => {
-    const [startFile, startRank] = coordinates.split('');
-    const directions = [-1, 0, 1];
-    const directionsCombination = directions
-        .flatMap(direction => directions.map(value => [direction, value]));
-    const moves = directionsCombination
-        .map(direction => `${getMoveFileCoordinates(startFile, direction[0], player)}${getMoveRankCoordinates(startRank, direction[1], player)}`)
-        .filter(coordinates => getPlayerFromCoordinates(coordinates) !== player);
-    moves.forEach(move => highlightSquare(move));
+        const [startFile, startRank] = coordinates.split('');
+        const directions = [-1, 0, 1];
+        const directionsCombination = directions
+            .flatMap(direction => directions.map(value => [direction, value]))
+            .filter(combination => combination.every(value => value === 0));
+        const moves = directionsCombination
+            .map(direction => `${getMoveFileCoordinates(startFile, direction[0], player)}${getMoveRankCoordinates(startRank, direction[1], player)}`)
+            .filter(coordinates => getPlayerFromCoordinates(coordinates) !== player);
+        moves.forEach(move => highlightSquare(move));
+    }
+const getMoveRankCoordinates = (startRank, numberOfSquares, player) => {
+        const playerVariant = player === 'white' ? 1 : -1;
+        const startRankNumber = typeof startRank === 'string' ?
+            Number.parseInt(startRank) :
+            startRank;
+        return startRankNumber + numberOfSquares * playerVariant;
+    }
+const getMoveFileCoordinates = (startFile, numberOfSquares, player) => {
+    const playerVariant = player === 'white' ? 1 : -1;
+    const startFileIndex = FILES.indexOf(startFile);
+    const finalFileIndex = startFileIndex + numberOfSquares * playerVariant;
+    return FILES[finalFileIndex];
+}
+
+const getPlayerFromCoordinates = coordinates => {
+    const domElement = document.getElementById(coordinates);
+    if (domElement === null) {
+        return null;
+    }
+    const childElement = domElement.firstChild;
+    const player = childElement && childElement.attributes.player.value;
+    return player;
+}
+
+const highlightSquare = (coordinates, specialMove) => {
+    const element = document.getElementById(coordinates);
+    if (element === null) {
+        return;
+    }
+    element.setAttribute('highlighted', true);
+    if (specialMove) {
+        element.setAttribute('specialMove', specialMove);
+    }
+};
+
+const setUpSpecialMoves = (piece, coordinates, player) => {
+    const newPiece = piece.cloneNode(true);
+    // promotion
+    if (newPiece.attributes.piece.value === 'pawn') {
+        const rank = coordinates[1];
+        if ((player === 'white' && rank === '8') || (player === 'black' && rank === '1')) {
+            newPiece.setAttribute('piece', 'rook');
+            newPiece.classList.remove('fa-chess-pawn');
+            newPiece.classList.add('fa-chess-rook');
+        }
+    }
+    return newPiece;
 }
 
 const castling = (piece, initialCoordinates, player) => {
@@ -489,22 +531,25 @@ const removeEnPassant = (player) => {
     });
 }
 
-const handleMouseDownOnSquare = event => {
-    event.preventDefault() // Impede que tabuleiro seja arrastado junto
-    const coordinates = event.target.id;
-    const piece = getPieceFromCoordinates(coordinates);
-    if (!piece) {
-        console.log(`Peça na coordenada ${coordinates.toUpperCase()}: vazio`);
-        return;
+const executeAITurn = (player) => {
+    const pieces = Array.from(document.querySelectorAll(`[player='${player}']`));
+    const length = pieces.length;
+    const randomIndex = Math.floor(Math.random() * length);
+    const pieceElement = pieces[randomIndex];
+
+    const hightlightAvailableMovesFn = getHighlightAvailableMovesFnBySelectedPiece(pieceElement.attributes.piece.value);
+    hightlightAvailableMovesFn(player, pieceElement.parentElement.id, pieceElement.attributes.alreadyMoved && pieceElement.attributes.alreadyMoved.value);
+
+    const highlightedSquares = Array.from(document.querySelectorAll("[highlighted = 'true']"));
+    if (highlightedSquares.length === 0) {
+        return executeAITurn(player);
     }
-    event.target.firstChild.setAttribute('selected', true);
-    const pieceColor = event.target.firstChild.attributes.player.value;
-    console.log(`Peça na coordenada ${coordinates.toUpperCase()}: ${piece} ${pieceColor}`);
-    if (!isPieceFromActivePlayer(pieceColor)) {
-        return;
-    }
-    const hightlightAvailableMovesFn = getHighlightAvailableMovesFnBySelectedPiece(piece);
-    const alreadyMoved = event.target.firstChild.attributes.alreadyMoved &&
-        event.target.firstChild.attributes.alreadyMoved.value;
-    hightlightAvailableMovesFn(pieceColor, coordinates, alreadyMoved);
-};
+    const destSquare = highlightedSquares[highlightedSquares.length - 1];
+
+    pieceElement.setAttribute('selected', true);
+    handleMouseUpOnSquare({ target: destSquare });
+}
+
+const startAIvsAI = () => {
+    document.getElementById('start-ia-vs-ia').setAttribute('class', 'text-decoration-line-trough');
+}
